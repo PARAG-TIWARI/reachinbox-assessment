@@ -22,6 +22,7 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url().default('redis://localhost:6380'),
   ELASTICSEARCH_URL: z.string().url().default('http://localhost:9200'),
+  ELASTICSEARCH_API_KEY: z.string().min(1).optional(),
   ES_INDEX: z.string().regex(/^[a-z0-9-]+$/).default('emails'),
 
   // Optional so the server can boot before credentials exist; the feature returns 503 until set.
