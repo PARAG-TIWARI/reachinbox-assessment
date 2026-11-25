@@ -10,7 +10,7 @@ const int = (def: number, min = 0) => z.coerce.number().int().min(min).default(d
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  API_PORT: int(4000, 1),
+  API_PORT: int(Number(process.env.PORT) || 4000, 1),
   WEB_URL: z.string().url().default('http://localhost:5173'),
   API_URL: z.string().url().default('http://localhost:4000'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),

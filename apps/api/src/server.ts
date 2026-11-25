@@ -9,7 +9,7 @@ import { closeQueues } from './queues/queues.js';
 const app = createApp();
 // Search is not on the critical path: if ES is down the API still serves everything else.
 app.search.ensureIndex().catch((err) => logger.warn({ err: err.message }, 'elasticsearch index check failed'));
-const server = app.listen(env.API_PORT, () => {
+const server = app.listen(env.API_PORT, "0.0.0.0", () => {
   logger.info(`API listening on ${env.API_URL} (web: ${env.WEB_URL}, queues: ${env.API_URL}/admin/queues)`);
 });
 
