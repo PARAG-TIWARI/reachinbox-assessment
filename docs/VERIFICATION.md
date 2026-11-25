@@ -1,4 +1,4 @@
-# Verification log
+﻿# Verification log
 
 Evidence for the claims in the README. Everything below was run against the real stack
 (Postgres, Redis with AOF, Elasticsearch, **real Ethereal SMTP**) on 2026-09-29, not mocks.
@@ -13,26 +13,26 @@ Re-run any of it yourself with the commands shown.
 | Lint                                                                  | `npm run lint`                                                          | clean                             |
 | No cron anywhere (hard constraint)                                    | `npm run check:no-cron`                                                 | passed                            |
 | Dependency audit (prod + dev)                                         | `npm audit`                                                             | **0 vulnerabilities**             |
-| Accessibility (axe-core, WCAG 2.1 A/AA)                               | all 7 pages × light and dark, plus the Ask Inbox palette and panel open | **0 violations**                  |
-| Fresh clone → running                                                 | copy without `node_modules` → `npm ci` → `npm run setup` → test → build | passes end to end                 |
+| Accessibility (axe-core, WCAG 2.1 A/AA)                               | all 7 pages ├ù light and dark, plus the Ask Inbox palette and panel open | **0 violations**                  |
+| Fresh clone ΓåÆ running                                                 | copy without `node_modules` ΓåÆ `npm ci` ΓåÆ `npm run setup` ΓåÆ test ΓåÆ build | passes end to end                 |
 
 ## Restart & resilience drills
 
-Config for drills: 100/sender per 60 s window, ≥ 500 ms between sends, concurrency 5.
-Duplicates are measured as `sent rows − distinct Message-IDs` (Message-IDs are deterministic per email).
+Config for drills: 100/sender per 60 s window, ΓëÑ 500 ms between sends, concurrency 5.
+Duplicates are measured as `sent rows ΓêÆ distinct Message-IDs` (Message-IDs are deterministic per email).
 
 | Drill                    | What we did                                                                           | Result                                                                                                                                                                                                                                                               |
 | ------------------------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A. Worker hard crash** | 40 emails due; `kill -9` the worker mid-send; API kept serving (200s); restart worker | Reconciler: all 25 pending jobs still in Redis (0 re-queued). **35 sent, 0 duplicates**, min gap 502 ms. The 5 emails in-flight at the kill → `FAILED · interrupted_before_confirmation` after the stale lock expired — **never re-sent** (at-most-once, by design). |
+| **A. Worker hard crash** | 40 emails due; `kill -9` the worker mid-send; API kept serving (200s); restart worker | Reconciler: all 25 pending jobs still in Redis (0 re-queued). **35 sent, 0 duplicates**, min gap 502 ms. The 5 emails in-flight at the kill ΓåÆ `FAILED ┬╖ interrupted_before_confirmation` after the stale lock expired ΓÇö **never re-sent** (at-most-once, by design). |
 | **B. API crash**         | 30 emails; `kill -9` the API mid-send                                                 | Worker kept sending with the API down: **30/30 sent**, 0 duplicates, min gap 501 ms.                                                                                                                                                                                 |
-| **C. Redis restart**     | 60 emails (1/s); `docker restart` Redis mid-run                                       | 56 delayed jobs before → still there after (AOF). Worker logged 4 connection errors, reconnected by itself. **60/60 sent, 0 duplicates.**                                                                                                                            |
-| **D. Two workers**       | 2 worker processes × concurrency 5, 60 emails due at once                             | Work split **40 / 20**; **60/60 sent, 0 duplicates**, min per-sender gap **500 ms** across processes.                                                                                                                                                                |
+| **C. Redis restart**     | 60 emails (1/s); `docker restart` Redis mid-run                                       | 56 delayed jobs before ΓåÆ still there after (AOF). Worker logged 4 connection errors, reconnected by itself. **60/60 sent, 0 duplicates.**                                                                                                                            |
+| **D. Two workers**       | 2 worker processes ├ù concurrency 5, 60 emails due at once                             | Work split **40 / 20**; **60/60 sent, 0 duplicates**, min per-sender gap **500 ms** across processes.                                                                                                                                                                |
 | **Graceful stop**        | `SIGTERM` the worker mid-run                                                          | In-flight sends finished, queues/SMTP/DB closed in order, **0 rows left SENDING**.                                                                                                                                                                                   |
 
 ## Rate limiting under load
 
 ```
-npm run dev:demo                                 # 60 s windows, 4/sender, ≥ 2 s between sends
+npm run dev:demo                                 # 60 s windows, 4/sender, ΓëÑ 2 s between sends
 npm run demo -w @ri/api -- load --count 1000
 ```
 
@@ -52,10 +52,10 @@ Per sender per 60s window (limit 4):
   16:01:00  xzhkbh6iy7yazfjf@ethereal.email    4
   16:01:00  yglnddkswzghczkc@ethereal.email    4
   16:02:00  m4imrqiw6hybk4wc@ethereal.email    4
-  …
+  ΓÇª
 ```
 
-1,000 emails due at once → none dropped or failed; exactly the configured 4/sender/window; the rest wait
+1,000 emails due at once ΓåÆ none dropped or failed; exactly the configured 4/sender/window; the rest wait
 as `RATE_LIMITED` in their original order, and a Slack/in-app alert fires once per sender per window.
 
 ## Security review (Phase 5)
@@ -63,11 +63,11 @@ as `RATE_LIMITED` in their original order, and a Slack/in-app alert fires once p
 | #    | Finding                                                                                                                                                                       | Fix                                                                | Test                             |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------- |
 | S1   | Request logs recorded OAuth `?code=&state=` in plaintext                                                                                                                      | Redacting request serializer                                       | `security.test.ts`               |
-| S2   | JWT verify didn't pin the algorithm                                                                                                                                           | `algorithms: ['HS256']` (session + Slack state)                    | forged `alg:none` token → 401    |
+| S2   | JWT verify didn't pin the algorithm                                                                                                                                           | `algorithms: ['HS256']` (session + Slack state)                    | forged `alg:none` token ΓåÆ 401    |
 | S3   | Any signed-in user could use Bull Board's retry/delete on everyone's jobs                                                                                                     | Optional `ADMIN_EMAILS` allowlist                                  | 403 for non-admin, 200 for admin |
-| S4   | No throttling on login / campaign creation                                                                                                                                    | Redis fixed-window limits → 429 + `Retry-After`                    | 21st request → 429               |
-| S5   | Search 503 leaked internal error text                                                                                                                                         | Details only outside production                                    | —                                |
-| Deps | nodemailer ≤10.0.1 (incl. _cross-tenant SMTP credential disclosure_ across transports — relevant: one transport per sender), react-router open redirect, deepmerge-ts, vitest | nodemailer 10, react-router 7, deepmerge-ts 8 (override), vitest 5 | `npm audit` → 0                  |
+| S4   | No throttling on login / campaign creation                                                                                                                                    | Redis fixed-window limits ΓåÆ 429 + `Retry-After`                    | 21st request ΓåÆ 429               |
+| S5   | Search 503 leaked internal error text                                                                                                                                         | Details only outside production                                    | ΓÇö                                |
+| Deps | nodemailer Γëñ10.0.1 (incl. _cross-tenant SMTP credential disclosure_ across transports ΓÇö relevant: one transport per sender), react-router open redirect, deepmerge-ts, vitest | nodemailer 10, react-router 7, deepmerge-ts 8 (override), vitest 5 | `npm audit` ΓåÆ 0                  |
 
 Already in place: httpOnly + SameSite=Lax session cookie (blocks cross-site POSTs), AES-256-GCM for SMTP
 passwords and Slack tokens, tenant scoping on every query (tests for list, detail, search, controls, SSE),
