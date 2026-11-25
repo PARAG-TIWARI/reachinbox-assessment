@@ -1,32 +1,41 @@
-# ReachInbox Scheduler
+# ReachInbox — Email Scheduler & Campaign Dashboard
 
-A production-grade **email job scheduler + dashboard**: schedule thousands of emails, send them through
-multiple Ethereal SMTP senders with per-sender throttling and hourly limits, survive restarts without
-losing or duplicating a single email, and watch it all happen live.
+A full-stack email scheduling application built around **BullMQ + Redis**, with a React dashboard and an Express API. It supports delayed email jobs, per-sender throttling, hourly limits, retries, persistence across restarts, and live status updates.
 
-Built with **TypeScript · Express · BullMQ + Redis · PostgreSQL (Prisma) · Elasticsearch · React + Tailwind**.
-No cron anywhere — every send time is a BullMQ delayed job.
+Built with **TypeScript · Express · BullMQ · Redis · PostgreSQL · Prisma · Elasticsearch · React · Vite · Tailwind CSS**. No cron jobs: scheduled sends are represented as BullMQ delayed jobs.
 
-> ▶ **Demo video:** https://drive.google.com/file/d/1HoR1W8dbNRUeALc_BVn08EHqL2wGDkqZ/view?usp=drive_link · 📋 **Evidence for every claim below:** [`docs/VERIFICATION.md`](docs/VERIFICATION.md)
+## Live deployment
 
-![Scheduled emails, rate-limited rows resuming in order](docs/screenshots/scheduled.png)
+| Component | Link / hosting |
+|---|---|
+| Frontend | [Open ReachInbox](https://reachinbox-assessment-amber.vercel.app) |
+| API health | [Check API health](https://reachinbox-assessment-xv55.onrender.com/healthz) |
+| Frontend hosting | Vercel |
+| API hosting | Render |
+| Data and queue services | Neon PostgreSQL · Upstash Redis · Elasticsearch Serverless |
+
+> **Deployment note:** The frontend and API are deployed. The BullMQ worker is a separate process and still needs its own running deployment for unattended scheduled jobs and email processing. Ethereal SMTP is for test previews; it does not deliver messages to real recipient inboxes.
+
+📋 **Engineering evidence:** [Verification notes](docs/VERIFICATION.md)
 
 ---
 
+
 ## Contents
 
-1. [Highlights](#highlights)
-2. [Quick start](#quick-start)
-3. [Configuration](#configuration) — Google OAuth, Slack, Ethereal, env vars
-4. [Running each part](#running-each-part)
-5. [Architecture](#architecture) — scheduling · persistence · idempotency · rate limiting & concurrency · load
-6. [Features](#features) — backend, frontend, beyond the brief
-7. [Screenshots](#screenshots)
+1. [Live deployment](#live-deployment)
+2. [Highlights](#highlights)
+3. [Quick start](#quick-start)
+4. [Configuration](#configuration) — Google OAuth, Slack, Ethereal, env vars
+5. [Running each part](#running-each-part)
+6. [Architecture](#architecture) — scheduling · persistence · idempotency · rate limiting & concurrency · load
+7. [Features](#features) — backend, frontend, beyond the brief
 8. [API](#api)
 9. [Testing & verification](#testing--verification)
 10. [Assumptions, shortcuts & trade-offs](#assumptions-shortcuts--trade-offs)
 
 ---
+
 
 ## Highlights
 
@@ -37,7 +46,7 @@ No cron anywhere — every send time is a BullMQ delayed job.
 | **Strict throttling**        | Min gap between two sends of one sender: **2,034 ms** measured for a 2,000 ms setting                                                                                                                                                |
 | **Hourly limits under load** | 1,000 emails due at once → **0 dropped**, exactly 4/sender/window in demo mode, the rest deferred in order                                                                                                                           |
 | **Slack alert**              | OAuth flow, encrypted token storage and one alert per sender per window are built and tested against a mocked Slack API (11 tests); a live run against real Slack needs your own Slack app ([setup below](#slack-rate-limit-alerts)) |
-| **Quality gates**            | 447 tests · strict TypeScript · ESLint · `npm audit` 0 vulns · axe WCAG 2.1 AA 0 violations (light and dark, every page) · CI                                                                                                                       |
+| **Quality gates**              | 447 tests · strict TypeScript · ESLint · axe accessibility checks · CI; one high-severity dependency audit finding remains open |
 
 ---
 
@@ -68,11 +77,14 @@ installs: **Postgres 5434, Redis 6380, Elasticsearch 9200**.
 
 ## Configuration
 
-### Google OAuth (required for login)
+### Google OAuth (optional sign-in)
 
 1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → **Create credentials → OAuth client ID → Web application**.
-2. Authorized redirect URI: `http://localhost:4000/api/auth/google/callback`
-3. Put the client ID/secret in `.env`, restart `npm run dev`.
+2. For local development, add `http://localhost:4000/api/auth/google/callback` as an authorized redirect URI.
+3. For the deployed app, also add `https://reachinbox-assessment-amber.vercel.app/api/auth/google/callback`.
+4. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_CALLBACK_URL` in the API host's environment (Render for this deployment). Never commit credentials to the repository.
+
+Email + password sign-in works independently; Google OAuth is an optional sign-in method.
 
 Scopes are `openid email profile`; the header shows the user's name, email and Google avatar.
 
@@ -358,18 +370,6 @@ Cancelling the remaining 976 took 0.18 s.
 | **Lead lists + checks**           | Save recipients as lists; check format, domain mail servers (MX), throwaway domains, role addresses and typos. Never contacts the mailbox                |
 | **Webhooks (API)**                | Signed (HMAC-SHA256) events for email sent/failed/bounced, campaign auto-paused, sender paused, rate limit hit; retries with backoff; private-network URLs refused at connect time. API only; no UI yet |
 | **One-command setup, demo tools** | `npm run setup`, `dev:demo`, `demo load / restart / verify / reset`                                                                                   |
-
----
-
-## Screenshots
-
-|                                                                                                                      |                                                                                                              |
-| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| ![Login](docs/screenshots/login.png) **Login** — Google, or email + password                                          | ![Scheduled](docs/screenshots/scheduled.png) **Scheduled** — send time in the pill, star, search and filter   |
-| ![Email](docs/screenshots/email.png) **Email page** — the message, delivery status and timeline                       | ![Compose](docs/screenshots/compose.png) **Compose** — recipient chips, rich text, Send Later, sending rules  |
-| ![Sent](docs/screenshots/sent.png) **Sent** — delivered and failed, with previews                                     | ![Email accounts](docs/screenshots/email-accounts.png) **Email accounts** — connect, health, warm-up, limits  |
-| ![Campaigns](docs/screenshots/campaigns.png) **Campaigns** — live progress, pause/resume/cancel, bounce protection   | ![Analytics](docs/screenshots/analytics.png) **Analytics** — sent, failed, deferred and quota meters          |
-| ![Dark](docs/screenshots/scheduled-dark.png) **Dark theme** — optional (light is the default)                         |                                                                                                              |
 
 ---
 
